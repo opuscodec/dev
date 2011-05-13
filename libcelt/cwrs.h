@@ -1,17 +1,19 @@
-/* Copyright (c) 2010 Xiph.Org Foundation
-   Written by Jean-Marc Valin */
+/* Copyright (c) 2007-2008 CSIRO
+   Copyright (c) 2007-2009 Xiph.Org Foundation
+   Copyright (c) 2007-2009 Timothy B. Terriberry
+   Written by Timothy B. Terriberry and Jean-Marc Valin */
 /*
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met:
-
+   
    - Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
-
+   
    - Redistributions in binary form must reproduce the above copyright
    notice, this list of conditions and the following disclaimer in the
    documentation and/or other materials provided with the distribution.
-
+   
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -25,34 +27,20 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef OPUS_DECODER_H
-#define OPUS_DECODER_H
+#ifndef CWRS_H
+#define CWRS_H
 
-#include "celt.h"
-#include "opus.h"
+#include "arch.h"
+#include "stack_alloc.h"
+#include "entenc.h"
+#include "entdec.h"
 
-struct OpusDecoder {
-	CELTDecoder *celt_dec;
-	void        *silk_dec;
-	int          channels;
-	int          stream_channels;
+int log2_frac(celt_uint32 val, int frac);
 
-    int          bandwidth;
-    /* Sampling rate (at the API level) */
-    int          Fs;
-    int          mode;
-    int          prev_mode;
-    int          frame_size;
-    int          prev_redundancy;
+void get_required_bits(celt_int16 *bits, int N, int K, int frac);
 
-#ifdef OPUS_TEST_RANGE_CODER_STATE
-    int          rangeFinal;
-#endif
-};
+void encode_pulses(const int *_y, int N, int K, ec_enc *enc);
 
-inline short SAT16(int x) {
-    return x > 32767 ? 32767 : x < -32768 ? -32768 : (short)x;
-};
+void decode_pulses(int *_y, int N, int K, ec_dec *dec);
 
-#endif /* OPUS_DECODER_H */
-
+#endif /* CWRS_H */

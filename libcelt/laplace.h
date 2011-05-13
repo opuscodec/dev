@@ -1,17 +1,18 @@
-/* Copyright (c) 2010 Xiph.Org Foundation
+/* Copyright (c) 2007 CSIRO
+   Copyright (c) 2007-2009 Xiph.Org Foundation
    Written by Jean-Marc Valin */
 /*
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met:
-
+   
    - Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
-
+   
    - Redistributions in binary form must reproduce the above copyright
    notice, this list of conditions and the following disclaimer in the
    documentation and/or other materials provided with the distribution.
-
+   
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -25,34 +26,23 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef OPUS_DECODER_H
-#define OPUS_DECODER_H
+#include "entenc.h"
+#include "entdec.h"
 
-#include "celt.h"
-#include "opus.h"
+/** Encode a value that is assumed to be the realisation of a
+    Laplace-distributed random process
+ @param enc Entropy encoder state
+ @param value Value to encode
+ @param fs Probability of 0, multiplied by 32768
+ @param decay Probability of the value +/- 1, multiplied by 16384
+*/
+void ec_laplace_encode(ec_enc *enc, int *value, int fs, int decay);
 
-struct OpusDecoder {
-	CELTDecoder *celt_dec;
-	void        *silk_dec;
-	int          channels;
-	int          stream_channels;
-
-    int          bandwidth;
-    /* Sampling rate (at the API level) */
-    int          Fs;
-    int          mode;
-    int          prev_mode;
-    int          frame_size;
-    int          prev_redundancy;
-
-#ifdef OPUS_TEST_RANGE_CODER_STATE
-    int          rangeFinal;
-#endif
-};
-
-inline short SAT16(int x) {
-    return x > 32767 ? 32767 : x < -32768 ? -32768 : (short)x;
-};
-
-#endif /* OPUS_DECODER_H */
-
+/** Decode a value that is assumed to be the realisation of a
+    Laplace-distributed random process
+ @param dec Entropy decoder state
+ @param fs Probability of 0, multiplied by 32768
+ @param decay Probability of the value +/- 1, multiplied by 16384
+ @return Value decoded
+ */
+int ec_laplace_decode(ec_dec *dec, int fs, int decay);

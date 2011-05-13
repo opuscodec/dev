@@ -1,4 +1,4 @@
-/* Copyright (c) 2010 Xiph.Org Foundation
+/* Copyright (c) 2009-2010 Xiph.Org Foundation
    Written by Jean-Marc Valin */
 /*
    Redistribution and use in source and binary forms, with or without
@@ -25,34 +25,31 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef OPUS_DECODER_H
-#define OPUS_DECODER_H
+#ifndef PLC_H
+#define PLC_H
 
-#include "celt.h"
-#include "opus.h"
+#include "arch.h"
 
-struct OpusDecoder {
-	CELTDecoder *celt_dec;
-	void        *silk_dec;
-	int          channels;
-	int          stream_channels;
+#define LPC_ORDER 24
 
-    int          bandwidth;
-    /* Sampling rate (at the API level) */
-    int          Fs;
-    int          mode;
-    int          prev_mode;
-    int          frame_size;
-    int          prev_redundancy;
+void _celt_lpc(celt_word16 *_lpc, const celt_word32 *ac, int p);
 
-#ifdef OPUS_TEST_RANGE_CODER_STATE
-    int          rangeFinal;
-#endif
-};
+void fir(const celt_word16 *x,
+         const celt_word16 *num,
+         celt_word16 *y,
+         int N,
+         int ord,
+         celt_word16 *mem);
 
-inline short SAT16(int x) {
-    return x > 32767 ? 32767 : x < -32768 ? -32768 : (short)x;
-};
+void iir(const celt_word32 *x,
+         const celt_word16 *den,
+         celt_word32 *y,
+         int N,
+         int ord,
+         celt_word16 *mem);
 
-#endif /* OPUS_DECODER_H */
 
+void _celt_autocorr(const celt_word16 *x, celt_word32 *ac, const celt_word16 *window, int overlap, int lag, int n);
+
+
+#endif /* PLC_H */

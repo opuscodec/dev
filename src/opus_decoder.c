@@ -36,7 +36,7 @@
 #include "opus_decoder.h"
 #include "entdec.h"
 #include "modes.h"
-#include "SKP_Silk_SDK_API.h"
+#include "silk_API.h"
 
 
 OpusDecoder *opus_decoder_create(int Fs, int channels)
@@ -46,7 +46,7 @@ OpusDecoder *opus_decoder_create(int Fs, int channels)
 	OpusDecoder *st;
 
 	/* Initialize SILK encoder */
-    ret = SKP_Silk_SDK_Get_Decoder_Size( &silkDecSizeBytes );
+    ret = silk_Get_Decoder_Size( &silkDecSizeBytes );
     if( ret ) {
         /* Handle error */
     }
@@ -60,7 +60,7 @@ OpusDecoder *opus_decoder_create(int Fs, int channels)
     st->Fs = Fs;
 
     /* Reset decoder */
-    ret = SKP_Silk_SDK_InitDecoder( st->silk_dec );
+    ret = silk_InitDecoder( st->silk_dec );
     if( ret ) {
         /* Handle error */
     }
@@ -110,7 +110,7 @@ static int opus_decode_frame(OpusDecoder *st, const unsigned char *data,
 {
 	int i, silk_ret=0, celt_ret=0;
 	ec_dec dec;
-    SKP_SILK_SDK_DecControlStruct DecControl;
+    silk_DecControlStruct DecControl;
     SKP_int32 silk_frame_size;
     short pcm_celt[960*2];
     short pcm_transition[960*2];
@@ -142,9 +142,6 @@ static int opus_decode_frame(OpusDecoder *st, const unsigned char *data,
         mode = st->prev_mode;
     }
 
-    if (st->stream_channels > st->channels)
-        return OPUS_CORRUPTED_DATA;
-
     if (data!=NULL && !st->prev_redundancy && mode != st->prev_mode && st->prev_mode > 0
     		&& !(mode == MODE_SILK_ONLY && st->prev_mode == MODE_HYBRID)
     		&& !(mode == MODE_HYBRID && st->prev_mode == MODE_SILK_ONLY))
@@ -168,9 +165,11 @@ static int opus_decode_frame(OpusDecoder *st, const unsigned char *data,
         SKP_int16 *pcm_ptr = pcm;
 
         if (st->prev_mode==MODE_CELT_ONLY)
-        	SKP_Silk_SDK_InitDecoder( st->silk_dec );
+        	silk_InitDecoder( st->silk_dec );
 
         DecControl.API_sampleRate = st->Fs;
+        DecControl.nChannelsAPI      = st->channels;
+        DecControl.nChannelsInternal = st->stream_channels;
         DecControl.payloadSize_ms = 1000 * audiosize / st->Fs;
         if( mode == MODE_SILK_ONLY ) {
             if( st->bandwidth == BANDWIDTH_NARROWBAND ) {
@@ -187,14 +186,13 @@ static int opus_decode_frame(OpusDecoder *st, const unsigned char *data,
             /* Hybrid mode */
             DecControl.internalSampleRate = 16000;
         }
-        DecControl.nChannels = st->channels;
 
         lost_flag = data == NULL ? 1 : 2 * decode_fec;
         decoded_samples = 0;
         do {
             /* Call SILK decoder */
             int first_frame = decoded_samples == 0;
-            silk_ret = SKP_Silk_SDK_Decode( st->silk_dec, &DecControl, 
+            silk_ret = silk_Decode( st->silk_dec, &DecControl, 
                 lost_flag, first_frame, &dec, pcm_ptr, &silk_frame_size );
             if( silk_ret ) {
                 fprintf (stderr, "SILK decode error\n");
@@ -276,10 +274,18 @@ static int opus_decode_frame(OpusDecoder *st, const unsigned char *data,
     {
         /* Decode CELT */
         celt_ret = celt_decode_with_ec(st->celt_dec, decode_fec?NULL:data, len, pcm_celt, frame_size, &dec);
-        for (i=0;i<frame_size*st->channels;i++)
-            pcm[i] = ADD_SAT16(pcm[i], pcm_celt[i]);
+        if( st->channels == st->stream_channels ) {
+            for (i=0;i<frame_size*st->channels;i++)
+                pcm[i] = SAT16(pcm[i] + (int)pcm_celt[i]);
+        } else if( st->channels == 2 && st->stream_channels == 1 ) {
+            for (i=0;i<frame_size*st->channels;i++)
+                pcm[2*i+1] = pcm[2*i] = SAT16(pcm[2*i] + (int)pcm_celt[i]);
+        } else {  /* st->channels == 1 && st->stream_channels == 2 */
+            // FIXME: do more efficiently inside CELT 
+            for (i=0;i<frame_size*st->channels;i++)
+                pcm[i] = SAT16(pcm[i] + ((pcm_celt[2*i] + (int)pcm_celt[2*i+1] + 1) >> 1));
+        } 
     }
-
 
     {
         const CELTMode *celt_mode;

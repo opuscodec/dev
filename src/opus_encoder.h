@@ -30,14 +30,14 @@
 
 #include "celt.h"
 #include "opus.h"
-#include "SKP_Silk_SDK_API.h"
+#include "silk_API.h"
 
 /* FIXME: This is only valid for 48 kHz */
 #define MAX_ENCODER_BUFFER 480
 
 struct OpusEncoder {
 	CELTEncoder *celt_enc;
-	SKP_SILK_SDK_EncControlStruct silk_mode;
+	silk_EncControlStruct silk_mode;
 	void        *silk_enc;
 	int          channels;
 	int          stream_channels;

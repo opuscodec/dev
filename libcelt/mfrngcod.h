@@ -1,5 +1,5 @@
-/* Copyright (c) 2010 Xiph.Org Foundation
-   Written by Jean-Marc Valin */
+/* Copyright (c) 2001-2008 Timothy B. Terriberry
+   Copyright (c) 2008-2009 Xiph.Org Foundation */
 /*
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
@@ -25,34 +25,32 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef OPUS_DECODER_H
-#define OPUS_DECODER_H
+#if !defined(_mfrngcode_H)
+# define _mfrngcode_H (1)
+# include "entcode.h"
 
-#include "celt.h"
-#include "opus.h"
+/*Constants used by the entropy encoder/decoder.*/
 
-struct OpusDecoder {
-	CELTDecoder *celt_dec;
-	void        *silk_dec;
-	int          channels;
-	int          stream_channels;
+/*The number of bits to output at a time.*/
+# define EC_SYM_BITS   (8)
+/*The total number of bits in each of the state registers.*/
+# define EC_CODE_BITS  (32)
+/*The maximum symbol value.*/
+# define EC_SYM_MAX    ((1U<<EC_SYM_BITS)-1)
+/*Bits to shift by to move a symbol into the high-order position.*/
+# define EC_CODE_SHIFT (EC_CODE_BITS-EC_SYM_BITS-1)
+/*Carry bit of the high-order range symbol.*/
+# define EC_CODE_TOP   (((celt_uint32)1U)<<EC_CODE_BITS-1)
+/*Low-order bit of the high-order range symbol.*/
+# define EC_CODE_BOT   (EC_CODE_TOP>>EC_SYM_BITS)
+/*Code for which propagating carries are possible.*/
+# define EC_CODE_CARRY (((celt_uint32)EC_SYM_MAX)<<EC_CODE_SHIFT)
+/*The number of bits available for the last, partial symbol in the code field.*/
+# define EC_CODE_EXTRA ((EC_CODE_BITS-2)%EC_SYM_BITS+1)
+/*A mask for the bits available in the coding buffer.
+  This allows different platforms to use a variable with more bits, if it is
+   convenient.
+  We will only use EC_CODE_BITS of it.*/
+# define EC_CODE_MASK  ((((celt_uint32)1U)<<EC_CODE_BITS-1)-1<<1|1)
 
-    int          bandwidth;
-    /* Sampling rate (at the API level) */
-    int          Fs;
-    int          mode;
-    int          prev_mode;
-    int          frame_size;
-    int          prev_redundancy;
-
-#ifdef OPUS_TEST_RANGE_CODER_STATE
-    int          rangeFinal;
 #endif
-};
-
-inline short SAT16(int x) {
-    return x > 32767 ? 32767 : x < -32768 ? -32768 : (short)x;
-};
-
-#endif /* OPUS_DECODER_H */
-

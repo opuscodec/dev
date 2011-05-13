@@ -1,17 +1,16 @@
-/* Copyright (c) 2010 Xiph.Org Foundation
-   Written by Jean-Marc Valin */
+/* (c) Copyright 2008/2009 Xiph.Org Foundation */
 /*
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met:
-
+   
    - Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
-
+   
    - Redistributions in binary form must reproduce the above copyright
    notice, this list of conditions and the following disclaimer in the
    documentation and/or other materials provided with the distribution.
-
+   
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -25,34 +24,31 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef OPUS_DECODER_H
-#define OPUS_DECODER_H
+#ifndef _dsp_fft_h_
+#define _dsp_fft_h_
 
-#include "celt.h"
-#include "opus.h"
+#include "config.h"
 
-struct OpusDecoder {
-	CELTDecoder *celt_dec;
-	void        *silk_dec;
-	int          channels;
-	int          stream_channels;
+#include "arch.h"
+#include "os_support.h"
+#include "mathops.h"
+#include "stack_alloc.h"
 
-    int          bandwidth;
-    /* Sampling rate (at the API level) */
-    int          Fs;
-    int          mode;
-    int          prev_mode;
-    int          frame_size;
-    int          prev_redundancy;
+typedef struct {
+  int nfft;
+  int shift;
+  celt_int32 *twiddle;
+  celt_int32 *itwiddle;
+} c64_fft_t;
 
-#ifdef OPUS_TEST_RANGE_CODER_STATE
-    int          rangeFinal;
+extern c64_fft_t *c64_fft16_alloc(int length, int x, int y);
+extern void c64_fft16_free(c64_fft_t *state);
+extern void c64_fft16_inplace(c64_fft_t *state, celt_int16 *X);
+extern void c64_ifft16(c64_fft_t *state, const celt_int16 *X, celt_int16 *Y);
+
+extern c64_fft_t *c64_fft32_alloc(int length, int x, int y);
+extern void c64_fft32_free(c64_fft_t *state);
+extern void c64_fft32(c64_fft_t *state, const celt_int32 *X, celt_int32 *Y);
+extern void c64_ifft32(c64_fft_t *state, const celt_int32 *X, celt_int32 *Y);
+
 #endif
-};
-
-inline short SAT16(int x) {
-    return x > 32767 ? 32767 : x < -32768 ? -32768 : (short)x;
-};
-
-#endif /* OPUS_DECODER_H */
-

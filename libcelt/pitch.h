@@ -1,17 +1,23 @@
-/* Copyright (c) 2010 Xiph.Org Foundation
+/* Copyright (c) 2007-2008 CSIRO
+   Copyright (c) 2007-2009 Xiph.Org Foundation
    Written by Jean-Marc Valin */
+/**
+   @file pitch.h
+   @brief Pitch analysis
+ */
+
 /*
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met:
-
+   
    - Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
-
+   
    - Redistributions in binary form must reproduce the above copyright
    notice, this list of conditions and the following disclaimer in the
    documentation and/or other materials provided with the distribution.
-
+   
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -25,34 +31,19 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef OPUS_DECODER_H
-#define OPUS_DECODER_H
 
-#include "celt.h"
-#include "opus.h"
+#ifndef _PITCH_H
+#define _PITCH_H
 
-struct OpusDecoder {
-	CELTDecoder *celt_dec;
-	void        *silk_dec;
-	int          channels;
-	int          stream_channels;
+#include "modes.h"
 
-    int          bandwidth;
-    /* Sampling rate (at the API level) */
-    int          Fs;
-    int          mode;
-    int          prev_mode;
-    int          frame_size;
-    int          prev_redundancy;
+void pitch_downsample(celt_sig * restrict x[], celt_word16 * restrict x_lp,
+      int len, int _C);
 
-#ifdef OPUS_TEST_RANGE_CODER_STATE
-    int          rangeFinal;
+void pitch_search(const celt_word16 * restrict x_lp, celt_word16 * restrict y,
+                  int len, int max_pitch, int *pitch);
+
+celt_word16 remove_doubling(celt_word16 *x, int maxperiod, int minperiod,
+      int N, int *T0, int prev_period, celt_word16 prev_gain);
+
 #endif
-};
-
-inline short SAT16(int x) {
-    return x > 32767 ? 32767 : x < -32768 ? -32768 : (short)x;
-};
-
-#endif /* OPUS_DECODER_H */
-

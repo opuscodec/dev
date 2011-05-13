@@ -36,7 +36,7 @@
 #include "opus_encoder.h"
 #include "entenc.h"
 #include "modes.h"
-#include "SKP_Silk_SDK_API.h"
+#include "silk_API.h"
 
 OpusEncoder *opus_encoder_create(int Fs, int channels)
 {
@@ -46,7 +46,7 @@ OpusEncoder *opus_encoder_create(int Fs, int channels)
 	int ret, silkEncSizeBytes, celtEncSizeBytes;
 
     /* Create SILK encoder */
-    ret = SKP_Silk_SDK_Get_Encoder_Size( &silkEncSizeBytes );
+    ret = silk_Get_Encoder_Size( &silkEncSizeBytes );
     if( ret ) {
     	/* Handle error */
     }
@@ -59,21 +59,25 @@ OpusEncoder *opus_encoder_create(int Fs, int channels)
 
     st->Fs = Fs;
 
-    ret = SKP_Silk_SDK_InitEncoder( st->silk_enc, &st->silk_mode );
+    ret = silk_InitEncoder( st->silk_enc, &st->silk_mode );
     if( ret ) {
         /* Handle error */
     }
 
     /* default SILK parameters */
-    st->silk_mode.API_sampleRate        = st->Fs;
-    st->silk_mode.nChannels             = channels;
-    st->silk_mode.maxInternalSampleRate = 16000;
-    st->silk_mode.minInternalSampleRate = 8000;
-    st->silk_mode.payloadSize_ms        = 20;
-    st->silk_mode.packetLossPercentage  = 0;
-    st->silk_mode.useInBandFEC          = 0;
-    st->silk_mode.useDTX                = 0;
-    st->silk_mode.complexity            = 10;
+    st->silk_mode.nChannelsAPI              = channels;
+    st->silk_mode.nChannelsInternal         = channels;
+    st->silk_mode.API_sampleRate            = st->Fs;
+    st->silk_mode.maxInternalSampleRate     = 16000;
+    st->silk_mode.minInternalSampleRate     = 8000;
+    st->silk_mode.desiredInternalSampleRate = 16000;
+    st->silk_mode.payloadSize_ms            = 20;
+    st->silk_mode.bitRate                   = 25000;
+    st->silk_mode.packetLossPercentage      = 0;
+    st->silk_mode.complexity                = 10;
+    st->silk_mode.useInBandFEC              = 0;
+    st->silk_mode.useDTX                    = 0;
+    st->silk_mode.useCBR                    = 0;
 
     /* Create CELT encoder */
 	/* Initialize CELT encoder */
@@ -111,12 +115,12 @@ int opus_encode(OpusEncoder *st, const short *pcm, int frame_size,
     int redundancy = 0;
     int redundancy_bytes = 0;
     int celt_to_silk = 0;
-    short pcm_buf[960*2];
+    short pcm_buf[60*48*2];
     int nb_compr_bytes;
     int to_celt = 0;
     celt_int32 mono_rate;
 
-    if (st->channels == 2)
+    if (st->mode == MODE_CELT_ONLY && st->channels == 2)
     {
         celt_int32 decision_rate;
         decision_rate = st->bitrate_bps + st->voice_ratio*st->voice_ratio;
@@ -128,8 +132,6 @@ int opus_encode(OpusEncoder *st, const short *pcm, int frame_size,
             st->stream_channels = 2;
         else
             st->stream_channels = 1;
-    } else {
-        st->stream_channels = 1;
     }
     /* Equivalent bit-rate for mono */
     mono_rate = st->bitrate_bps;
@@ -215,13 +217,13 @@ int opus_encode(OpusEncoder *st, const short *pcm, int frame_size,
 	data += 1;
 	if (st->mode != MODE_CELT_ONLY && st->prev_mode == MODE_CELT_ONLY)
 	{
-		SKP_SILK_SDK_EncControlStruct dummy;
-		SKP_Silk_SDK_InitEncoder( st->silk_enc, &dummy);
+		silk_EncControlStruct dummy;
+		silk_InitEncoder( st->silk_enc, &dummy);
 		prefill=1;
 	}
-	if (st->prev_mode >0 &&
-	        ((st->mode != MODE_CELT_ONLY && st->prev_mode == MODE_CELT_ONLY)
-	        || (st->mode == MODE_CELT_ONLY && st->prev_mode != MODE_CELT_ONLY)))
+	if (st->prev_mode > 0 &&
+	       ((st->mode != MODE_CELT_ONLY && st->prev_mode == MODE_CELT_ONLY) ||
+	        (st->mode == MODE_CELT_ONLY && st->prev_mode != MODE_CELT_ONLY)))
 	{
 	    redundancy = 1;
 	    celt_to_silk = (st->mode != MODE_CELT_ONLY);
@@ -245,6 +247,7 @@ int opus_encode(OpusEncoder *st, const short *pcm, int frame_size,
     {
         st->silk_mode.bitRate = st->bitrate_bps - 8*st->Fs/frame_size;
         if( st->mode == MODE_HYBRID ) {
+            st->silk_mode.bitRate /= st->stream_channels;
             if( st->bandwidth == BANDWIDTH_SUPERWIDEBAND ) {
                 if( st->Fs == 100 * frame_size ) {
                     /* 24 kHz, 10 ms */
@@ -262,6 +265,7 @@ int opus_encode(OpusEncoder *st, const short *pcm, int frame_size,
                     st->silk_mode.bitRate = ( st->silk_mode.bitRate + 9000 + st->use_vbr * 1000 ) / 2;
                 }
             }
+            st->silk_mode.bitRate *= st->stream_channels;
             /* don't let SILK use more than 80% */
             if( st->silk_mode.bitRate > ( st->bitrate_bps - 8*st->Fs/frame_size ) * 4/5 ) {
                 st->silk_mode.bitRate = ( st->bitrate_bps - 8*st->Fs/frame_size ) * 4/5;
@@ -269,6 +273,8 @@ int opus_encode(OpusEncoder *st, const short *pcm, int frame_size,
         }
 
         st->silk_mode.payloadSize_ms = 1000 * frame_size / st->Fs;
+        st->silk_mode.nChannelsAPI = st->channels;
+        st->silk_mode.nChannelsInternal = st->stream_channels;
         if (st->bandwidth == BANDWIDTH_NARROWBAND) {
         	st->silk_mode.desiredInternalSampleRate = 8000;
         } else if (st->bandwidth == BANDWIDTH_MEDIUMBAND) {
@@ -290,10 +296,10 @@ int opus_encode(OpusEncoder *st, const short *pcm, int frame_size,
         if (prefill)
         {
             int zero=0;
-        	SKP_Silk_SDK_Encode( st->silk_enc, &st->silk_mode, st->delay_buffer, st->encoder_buffer, NULL, &zero, 1 );
+        	silk_Encode( st->silk_enc, &st->silk_mode, st->delay_buffer, st->encoder_buffer, NULL, &zero, 1 );
         }
 
-        ret = SKP_Silk_SDK_Encode( st->silk_enc, &st->silk_mode, pcm, frame_size, &enc, &nBytes, 0 );
+        ret = silk_Encode( st->silk_enc, &st->silk_mode, pcm, frame_size, &enc, &nBytes, 0 );
         if( ret ) {
             fprintf (stderr, "SILK encode error: %d\n", ret);
             /* Handle error */
@@ -524,6 +530,18 @@ int opus_encoder_ctl(OpusEncoder *st, int request, ...)
         {
             int *value = va_arg(ap, int*);
             *value = st->bitrate_bps;
+        }
+        break;
+        case OPUS_SET_FORCE_MONO_REQUEST:
+        {
+            int value = va_arg(ap, int);
+            st->stream_channels = value ? 1 : st->channels;
+        }
+        break;
+        case OPUS_GET_FORCE_MONO_REQUEST:
+        {
+            int *value = va_arg(ap, int*);
+            *value = st->stream_channels == 1 && st->channels == 2;
         }
         break;
         case OPUS_SET_BANDWIDTH_REQUEST:
